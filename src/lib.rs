@@ -139,6 +139,32 @@ pub struct Vertex {
     pub luminance: f32,
 }
 
+impl Default for Vertex {
+    fn default() -> Self {
+        Vertex {
+            x: 0.0,
+            y: 0.0,
+            depth: 0.0,
+            u: 0.0,
+            v: 0.0,
+            normal: [0.0; 3],
+            luminance: 1.0,
+        }
+    }
+}
+
+impl Vertex {
+    pub fn new(x: f32, y: f32) -> Self {
+        Vertex { x, y, ..Default::default() }
+    }
+    pub fn with_depth(x: f32, y: f32, depth: f32) -> Self {
+        Vertex { x, y, depth, ..Default::default() }
+    }
+    pub fn with_uv(x: f32, y: f32, u: f32, v: f32) -> Self {
+        Vertex { x, y, u, v, ..Default::default() }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Triangle {
     pub id: u32,
