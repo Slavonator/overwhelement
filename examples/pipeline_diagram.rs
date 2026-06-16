@@ -188,8 +188,6 @@ fn main() {
             img.put_pixel(x, y, pixel);
         }
     }
-    img.save("pipeline.png").expect("Failed to save PNG");
-    println!("Saved pipeline.png");
 
     let words = ["провайдер", "дискретизатор", "интерпретатор"];
     let font_data = include_bytes!("assets/DejaVuSans.ttf");
@@ -224,5 +222,5 @@ fn main() {
     }
 
     img.save("pipeline.png").expect("Failed to save PNG with text");
-    println!("Saved pipeline.png with numbers");
+    println!("Saved pipeline.png");
 }

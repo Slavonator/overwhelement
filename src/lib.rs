@@ -281,42 +281,67 @@ impl ElementBuffer {
 fn compute_viewport_transform(settings: &Settings, vp: &Viewport) -> (f32, f32, f32, f32) {
     let out_w = settings.output_width as f32;
     let out_h = settings.output_height as f32;
-    let vp_w = vp.width;
-    let vp_h = vp.height;
 
-    // Соотношение сторон с учётом element_aspect_ratio
+    // Абсолютные размеры для расчёта пропорций и масштаба
+    let abs_w = if vp.width.abs() == 0.0 { 1.0 } else { vp.width.abs() };
+    let abs_h = if vp.height.abs() == 0.0 { 1.0 } else { vp.height.abs() };
+
     let out_aspect = out_w / out_h * vp.element_aspect_ratio;
-    let vp_aspect = vp_w / vp_h;
+    let vp_aspect = abs_w / abs_h;
 
-    let (scale_x, scale_y) = match vp.scaling_mode {
-        ScalingMode::Stretch => (out_w / vp_w, out_h / vp_h),
+    let (base_scale_x, base_scale_y) = match vp.scaling_mode {
+        ScalingMode::Stretch => (out_w / abs_w, out_h / abs_h),
         ScalingMode::None => (1.0, 1.0),
         ScalingMode::Contain | ScalingMode::Cover => {
             if (vp.scaling_mode == ScalingMode::Contain && vp_aspect > out_aspect)
                 || (vp.scaling_mode == ScalingMode::Cover && vp_aspect <= out_aspect)
             {
-                let scale = out_w / vp_w;
+                let scale = out_w / abs_w;
                 (scale, scale)
             } else {
-                let scale = out_h / vp_h;
+                let scale = out_h / abs_h;
                 (scale, scale)
             }
         }
     };
 
-    let scaled_w = vp_w * scale_x;
-    let scaled_h = vp_h * scale_y;
+    // Размер в пикселях после масштабирования (всегда положительный)
+    let scaled_w = abs_w * base_scale_x;
+    let scaled_h = abs_h * base_scale_y;
 
-    let offset_x = match vp.horizontal_alignment {
-        HorizontalAlignment::Left => -vp.x * scale_x,
-        HorizontalAlignment::Center => -vp.x * scale_x + (out_w - scaled_w) / 2.0,
-        HorizontalAlignment::Right => -vp.x * scale_x + (out_w - scaled_w),
+    // Выравнивание считаем ДЛЯ НЕОТРАЖЁННОГО вьюпорта (как будто width и height положительны)
+    let offset_x_base = match vp.horizontal_alignment {
+        HorizontalAlignment::Left => -vp.x * base_scale_x,
+        HorizontalAlignment::Center => -vp.x * base_scale_x + (out_w - scaled_w) / 2.0,
+        HorizontalAlignment::Right => -vp.x * base_scale_x + (out_w - scaled_w),
     };
 
-    let offset_y = match vp.vertical_alignment {
-        VerticalAlignment::Top => -vp.y * scale_y,
-        VerticalAlignment::Center => -vp.y * scale_y + (out_h - scaled_h) / 2.0,
-        VerticalAlignment::Bottom => -vp.y * scale_y + (out_h - scaled_h),
+    let offset_y_base = match vp.vertical_alignment {
+        VerticalAlignment::Top => -vp.y * base_scale_y,
+        VerticalAlignment::Center => -vp.y * base_scale_y + (out_h - scaled_h) / 2.0,
+        VerticalAlignment::Bottom => -vp.y * base_scale_y + (out_h - scaled_h),
+    };
+
+    // Теперь применяем зеркалирование
+    // Если ширина отрицательна – отражаем по X: масштаб становится отрицательным,
+    // а начало отсчёта сдвигается так, чтобы видимый прямоугольник остался на том же месте.
+    let (scale_x, offset_x) = if vp.width < 0.0 {
+        (
+            -base_scale_x,                           // масштаб отрицательный
+            out_w - (offset_x_base + scaled_w),      // сдвиг, сохраняющий положение прямоугольника
+        )
+    } else {
+        (base_scale_x, offset_x_base)
+    };
+
+    // Аналогично для Y
+    let (scale_y, offset_y) = if vp.height < 0.0 {
+        (
+            -base_scale_y,
+            out_h - (offset_y_base + scaled_h),
+        )
+    } else {
+        (base_scale_y, offset_y_base)
     };
 
     (scale_x, scale_y, offset_x, offset_y)

@@ -14,3 +14,7 @@ ab_glyph = "0.2"
 [[example]]
 name = "diagram"
 path = "examples/pipeline_diagram.rs"
+
+[[example]]
+name = "plane-viewport"
+path = "examples/plane_viewport.rs"
