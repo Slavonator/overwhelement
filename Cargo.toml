@@ -12,9 +12,13 @@ rusttype = "0.9"
 ab_glyph = "0.2"
 
 [[example]]
-name = "diagram"
+name = "pipeline"
 path = "examples/pipeline_diagram.rs"
 
 [[example]]
 name = "plane-viewport"
 path = "examples/plane_viewport.rs"
+
+[[example]]
+name = "multiple-viewports"
+path = "examples/multiple_viewports.rs"

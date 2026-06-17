@@ -9,7 +9,6 @@ const H: u32 = 240;
 // Сплошной шейдер с фиксированным цветом и object_id
 struct SolidShader {
     color: [u8; 4],
-    object_id: u32,
 }
 
 impl ElementShader for SolidShader {
@@ -17,52 +16,59 @@ impl ElementShader for SolidShader {
         ShaderOutput {
             color: self.color,
             luminance: None,
-            object_id: Some(self.object_id),
+            object_id: None,
         }
     }
 }
 
 fn main() {
+    
+    let vw = 80;
+    let vh = 24;
+
+
     let mut scene = Scene {
         shader_pool: ShaderPool::new(),
         viewports: Vec::new(),
         planes: Vec::new(),
     };
 
+    
     // Шейдеры
-    let block_shader = scene.shader_pool.add(Rc::new(SolidShader {
-        color: [50, 120, 220, 255], // синий
-        object_id: 1,
-    }));
-    let arrow_shader = scene.shader_pool.add(Rc::new(SolidShader {
-        color: [180, 180, 180, 255], // серый
-        object_id: 2,
-    }));
+
+    let block_shader = SolidShader {color: [50, 120, 220, 255]};
+    
+    let arrow_shader = SolidShader {color: [180, 180, 180, 255]};
+
+
+    scene.shader_pool.add(Rc::new(block_shader));
+    scene.shader_pool.add(Rc::new(arrow_shader));
 
     // Вьюпорт на весь экран
     let vp = Viewport {
         x: 0.0,
         y: 0.0,
-        width: W as f32,
-        height: H as f32,
-        scaling_mode: ScalingMode::Stretch,
+        width: vw as f32,
+        height: vh as f32,
+        scaling_mode: ScalingMode::Cover,
         horizontal_alignment: HorizontalAlignment::Center,
         vertical_alignment: VerticalAlignment::Center,
         element_aspect_ratio: 1.0,
-        shader_map: vec![block_shader, arrow_shader],
+        shader_map: vec![0, 1],
         rotation_angle: 0.0,
     };
-    let vp_idx = scene.viewports.len() as u32;
+
     scene.viewports.push(vp);
 
     // Параметры блоков
-    let box_w = 160.0;
-    let box_h = 80.0;
-    let margin = 120.0;
-    let y = (H as f32 - box_h) / 2.0;
+    let box_w = 16.0;
+    let box_h = 8.0;
+    let margin = 8.0;
+
+    let y = (vh as f32 - box_h) / 2.0;
 
     // Позиции блоков
-    let x1 = 40.0;
+    let x1 = 8.0;
     let x2 = x1 + box_w + margin;
     let x3 = x2 + box_w + margin;
 
@@ -71,8 +77,10 @@ fn main() {
         id: 1,
         triangles: Vec::new(),
         lines: Vec::new(),
-        viewport_indices: vec![vp_idx],
+        viewport_indices: vec![0],
     };
+
+    let thickness = 4.0;
 
     // Функция для создания линий рамки блока
     let mut add_rect = |x: f32, y: f32, w: f32, h: f32| {
@@ -88,8 +96,8 @@ fn main() {
             plane.lines.push(Line {
                 id: 1,
                 vertices: [start, end],
-                local_shader_id: 0, // block_shader
-                thickness: 4.0,     // толстые линии для блоков
+                local_shader_id: 0,
+                thickness: thickness,
             });
         }
     };
@@ -101,23 +109,24 @@ fn main() {
 
     // Стрелки между блоками
     let arrow_y = y + box_h / 2.0;
+    let tip_w = 1.0;
+    let tip_h = 1.0;
+
     // Стрелка 1 → 2
     plane.lines.push(Line {
         id: 100,
         vertices: [
             Vertex::new(x1 + box_w, arrow_y),
-            Vertex::new(x2 - 10.0, arrow_y),
+            Vertex::new(x2 - (thickness / 10.0), arrow_y),
         ],
         local_shader_id: 1,
         thickness: 3.0,
     });
-    // Наконечник стрелки
-    let tip = x2 - 10.0;
     plane.lines.push(Line {
         id: 101,
         vertices: [
-            Vertex::new(tip, arrow_y),
-            Vertex::new(tip - 12.0, arrow_y - 8.0),
+            Vertex::new(x2 - (thickness / 10.0), arrow_y),
+            Vertex::new(x2 - (thickness / 10.0) - tip_h, arrow_y - tip_w),
         ],
         local_shader_id: 1,
         thickness: 3.0,
@@ -125,8 +134,8 @@ fn main() {
     plane.lines.push(Line {
         id: 102,
         vertices: [
-            Vertex::new(tip, arrow_y),
-            Vertex::new(tip - 12.0, arrow_y + 8.0),
+            Vertex::new(x2 - (thickness / 10.0), arrow_y),
+            Vertex::new(x2 - (thickness / 10.0) - tip_h, arrow_y + tip_w),
         ],
         local_shader_id: 1,
         thickness: 3.0,
@@ -137,17 +146,16 @@ fn main() {
         id: 200,
         vertices: [
             Vertex::new(x2 + box_w, arrow_y),
-            Vertex::new(x3 - 10.0, arrow_y),
+            Vertex::new(x3 - (thickness / 10.0), arrow_y),
         ],
         local_shader_id: 1,
         thickness: 3.0,
     });
-    let tip2 = x3 - 10.0;
     plane.lines.push(Line {
         id: 201,
         vertices: [
-            Vertex::new(tip2, arrow_y),
-            Vertex::new(tip2 - 12.0, arrow_y - 8.0),
+            Vertex::new(x3 - (thickness / 10.0), arrow_y),
+            Vertex::new(x3 - (thickness / 10.0) - tip_h, arrow_y - tip_w),
         ],
         local_shader_id: 1,
         thickness: 3.0,
@@ -155,8 +163,8 @@ fn main() {
     plane.lines.push(Line {
         id: 202,
         vertices: [
-            Vertex::new(tip2, arrow_y),
-            Vertex::new(tip2 - 12.0, arrow_y + 8.0),
+            Vertex::new(x3 - (thickness / 10.0), arrow_y),
+            Vertex::new(x3 - (thickness / 10.0) - tip_h, arrow_y + tip_w),
         ],
         local_shader_id: 1,
         thickness: 3.0,
@@ -200,17 +208,15 @@ fn main() {
     let box_w = 160.0;
     let box_h = 80.0;
     let y = (H as f32 - box_h) / 2.0;
-    let x1 = 40.0;
-    let x2 = x1 + box_w + 120.0;
-    let x3 = x2 + box_w + 120.0;
+    let x1 = 77.0;
+    let x2 = x1 + box_w + 80.0;
+    let x3 = x2 + box_w + 78.0;
 
     let centers = [
         (x1 + box_w / 2.0, y + box_h / 2.0),
         (x2 + box_w / 2.0, y + box_h / 2.0),
         (x3 + box_w / 2.0, y + box_h / 2.0),
     ];
-
-    let mut img = image::open("pipeline.png").expect("Failed to open PNG").to_rgba8();
 
     for (i, (cx, cy)) in centers.iter().enumerate() {
         let text = words[i];

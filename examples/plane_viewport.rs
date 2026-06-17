@@ -37,7 +37,7 @@ fn main() {
     let plane_shader = SolidShader {color: [130u8, 130u8, 230u8, 255u8]};
 
     // Шейдер, который будет изображать обводку плоскости
-    let plane_outline = SolidShader { color: [90u8, 90u8, 190u8, 255u8]};
+    let plane_outline = SolidShader {color: [90u8, 90u8, 190u8, 255u8]};
 
     // Шейдер, которй будет изображать вьюпорт
     let viewport_shader = SolidShader {color: [140u8, 230u8, 140u8, 255u8]};
