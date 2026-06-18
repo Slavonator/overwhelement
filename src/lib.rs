@@ -199,6 +199,18 @@ pub struct Scene {
     pub planes: Vec<Plane>,
 }
 
+
+impl Scene {
+    pub fn new() -> Self {
+        Self{
+            shader_pool: ShaderPool::new(),
+            viewports: Vec::new(),
+            planes: Vec::new(),
+        }
+    }
+}
+
+
 // ──── Элемент и буфер ──────────────────────────────────────────
 
 #[derive(Copy, Clone, Debug)]
@@ -284,9 +296,9 @@ fn compute_viewport_transform(settings: &Settings, vp: &Viewport) -> (f32, f32, 
 
     // Абсолютные размеры для расчёта пропорций и масштаба
     let abs_w = if vp.width.abs() == 0.0 { 1.0 } else { vp.width.abs() };
-    let abs_h = if vp.height.abs() == 0.0 { 1.0 } else { vp.height.abs() };
+    let abs_h = if vp.height.abs() == 0.0 { 1.0 } else { vp.height.abs() * vp.element_aspect_ratio };
 
-    let out_aspect = out_w / out_h * vp.element_aspect_ratio;
+    let out_aspect = out_w / out_h;
     let vp_aspect = abs_w / abs_h;
 
     let (base_scale_x, base_scale_y) = match vp.scaling_mode {
@@ -311,9 +323,9 @@ fn compute_viewport_transform(settings: &Settings, vp: &Viewport) -> (f32, f32, 
 
     // Выравнивание считаем ДЛЯ НЕОТРАЖЁННОГО вьюпорта (как будто width и height положительны)
     let offset_x_base = match vp.horizontal_alignment {
-        HorizontalAlignment::Left => -vp.x * base_scale_x,
+        HorizontalAlignment::Right => -vp.x * base_scale_x,
         HorizontalAlignment::Center => -vp.x * base_scale_x + (out_w - scaled_w) / 2.0,
-        HorizontalAlignment::Right => -vp.x * base_scale_x + (out_w - scaled_w),
+        HorizontalAlignment::Left => -vp.x * base_scale_x + (out_w - scaled_w),
     };
 
     let offset_y_base = match vp.vertical_alignment {
@@ -373,7 +385,7 @@ fn apply_viewport(
     vertex.x = vertex.x * scale_x + offset_x;
     vertex.y = vertex.y * scale_y + offset_y;
     if vp.element_aspect_ratio != 1.0 {
-        vertex.y /= vp.element_aspect_ratio;
+        vertex.y *= vp.element_aspect_ratio;
     }
 }
 

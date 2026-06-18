@@ -199,7 +199,7 @@ fn main() {
         }
     }
     // Шрифт (положите файл .ttf в папку assets/ или используйте системный)
-    let font_data = include_bytes!("assets/DejaVuSans.ttf");
+    let font_data = include_bytes!("../assets/DejaVuSans.ttf");
     let font = FontRef::try_from_slice(font_data).expect("Error loading font");
 
     let scale = PxScale { x: 30.0, y: 30.0 };

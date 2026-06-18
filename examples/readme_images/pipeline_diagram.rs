@@ -198,7 +198,7 @@ fn main() {
     }
 
     let words = ["провайдер", "дискретизатор", "интерпретатор"];
-    let font_data = include_bytes!("assets/DejaVuSans.ttf");
+    let font_data = include_bytes!("../assets/DejaVuSans.ttf");
     let font = FontRef::try_from_slice(font_data).expect("Error loading font");
 
     let scale = PxScale { x: 20.0, y: 20.0 };
