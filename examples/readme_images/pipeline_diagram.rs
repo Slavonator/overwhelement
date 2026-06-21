@@ -1,4 +1,4 @@
-use overwhelement::*;
+use::overwhelement::{datatypes::*, *};
 use image::{ImageBuffer, Rgba};
 use ab_glyph::{FontRef, PxScale};
 use std::rc::Rc;

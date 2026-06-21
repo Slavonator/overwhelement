@@ -25,7 +25,10 @@ name = "multiple-viewports"
 path = "examples/readme_images/multiple_viewports.rs"
 
 [[example]]
-name = "viewer"
-path = "examples/image_viewer/viewer.rs"
+name = "text-image-viewer"
+path = "examples/image_viewers/text_viewer.rs"
 
 
+[[example]]
+name = "8color-text-image-viewer"
+path = "examples/image_viewers/8color_text_viewer.rs"

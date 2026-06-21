@@ -1,4 +1,4 @@
-use overwhelement::*;
+use overwhelement::{datatypes::*, *};
 use image::{open, RgbaImage};
 use std::{env, rc::Rc};
 use terminal_size::{terminal_size};
@@ -36,7 +36,6 @@ fn main() {
     let img = open(filename).expect("Failed to open image").into_rgba8();
     println!("Image loaded: {}x{}", img.width(), img.height());
 
-    // Пул шейдеров
     let mut shaders = ShaderPool::new();
     
     let width = img.width() as f32;

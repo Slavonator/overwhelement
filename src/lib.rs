@@ -1,290 +1,30 @@
-use std::rc::Rc;
+pub mod datatypes;
 
-/// Значение object_id для пустого элемента
-pub const EMPTY_OBJECT_ID: u32 = u32::MAX;
+use datatypes::*;
 
-// ──── Настройки вывода ─────────────────────────────────────────
-
-#[derive(Copy, Clone, Debug)]
-pub enum HorizontalAlignment {
-    Left,
-    Center,
-    Right,
-}
-
-#[derive(Copy, Clone, Debug)]
-pub enum VerticalAlignment {
-    Top,
-    Center,
-    Bottom,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum ScalingMode {
-    /// Растянуть до размеров выходного буфера, игнорируя пропорции.
-    Stretch,
-    /// Вписать с сохранением пропорций, пустые места заливаются фоном.
-    Contain,
-    /// Заполнить всё с сохранением пропорций, обрезая выступающие части.
-    Cover,
-    /// Не масштабировать, координаты 1:1.
-    None,
-}
-
-/// Настройки дискретизации.
-#[derive(Clone, Debug)]
-pub struct Settings {
-    pub output_width: u32,
-    pub output_height: u32,
-    pub background_color: [u8; 3],
-    pub background_luminance: f32,
-}
-
-// ──── Элементарный шейдер ───────────────────────────────────────
-#[derive(Clone, Debug)]
-pub struct ShaderInput<'a> {
-    pub uv: (f32, f32),
-    pub normal: [f32; 3],
-    pub luminance: f32,
-    pub background_element: &'a Element,
-    pub fragment_depth: f32,
-    pub fragment_layer: u32,
-    pub object_id: u32,
-}
-
-#[derive(Clone, Debug)]
-pub struct ShaderOutput {
-    pub color: [u8; 4],
-    pub luminance: Option<f32>,
-    pub object_id: Option<u32>,
-}
-
-pub trait ElementShader {
-    fn shade(&self, input: &ShaderInput) -> ShaderOutput;
-}
-
-struct VoidShader;
-impl ElementShader for VoidShader {
-    fn shade(&self, _input: &ShaderInput) -> ShaderOutput {
-        ShaderOutput { color: [0,0,0,0], luminance: None, object_id: None }
-    }
-}
-
-#[derive(Clone)]
-pub struct ShaderPool {
-    pub fallback: Rc<dyn ElementShader>,
-    shaders: Vec<Rc<dyn ElementShader>>,
-}
-
-impl ShaderPool {
-    pub fn new() -> Self {
-        ShaderPool {
-            fallback: Rc::new(VoidShader),
-            shaders: Vec::new(),
-        }
-    }
-
-    /// Добавляет шейдер в пул и возвращает его индекс (0-based).
-    pub fn add(&mut self, shader: Rc<dyn ElementShader>) -> u32 {
-        let idx = self.shaders.len() as u32;
-        self.shaders.push(shader);
-        idx
-    }
-
-    /// Удаляет последний добавленный шейдер и возвращает его.
-    /// Возвращает `None`, если пул пуст.
-    pub fn pop(&mut self) -> Option<Rc<dyn ElementShader>> {
-        self.shaders.pop()
-    }
-
-    /// Получить шейдер по индексу. Если индекс невалидный, возвращает fallback.
-    pub fn get(&self, index: u32) -> Rc<dyn ElementShader> {
-        self.shaders
-            .get(index as usize)
-            .cloned()
-            .unwrap_or_else(|| self.fallback.clone())
-    }
-
-    pub fn len(&self) -> usize {
-        self.shaders.len()
-    }
-}
-
-// ──── Вьюпорт ─────────────────────────────────────────────────
-#[derive(Clone, Debug)]
-pub struct Viewport {
-    pub x: f32,
-    pub y: f32,
-    pub width: f32,
-    pub height: f32,
-    pub scaling_mode: ScalingMode,
-    pub horizontal_alignment: HorizontalAlignment,
-    pub vertical_alignment: VerticalAlignment,
-    pub element_aspect_ratio: f32,
-    /// Таблица: локальный shader_id (индекс) -> глобальный индекс в ShaderPool
-    pub shader_map: Vec<u32>,
-    pub rotation_angle: f32,
-}
-
-// ──── Геометрия ────────────────────────────────────────────────
-
-#[derive(Copy, Clone, Debug)]
-pub struct Vertex {
-    pub x: f32,
-    pub y: f32,
-    pub depth: f32,
-    pub u: f32,
-    pub v: f32,
-    pub normal: [f32; 3],
-    pub luminance: f32,
-}
-
-impl Default for Vertex {
-    fn default() -> Self {
-        Vertex {
-            x: 0.0,
-            y: 0.0,
-            depth: 0.0,
-            u: 0.0,
-            v: 0.0,
-            normal: [0.0; 3],
-            luminance: 1.0,
-        }
-    }
-}
-
-impl Vertex {
-    pub fn new(x: f32, y: f32) -> Self {
-        Vertex { x, y, ..Default::default() }
-    }
-    pub fn with_depth(x: f32, y: f32, depth: f32) -> Self {
-        Vertex { x, y, depth, ..Default::default() }
-    }
-    pub fn with_uv(x: f32, y: f32, u: f32, v: f32) -> Self {
-        Vertex { x, y, u, v, ..Default::default() }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Triangle {
-    pub id: u32,
-    pub vertices: [Vertex; 3],
-    /// Локальный индекс шейдера, интерпретируется через Viewport::shader_map
-    pub local_shader_id: u32,
-}
-
-#[derive(Clone, Debug)]
-pub struct Line {
-    pub id: u32,
-    pub vertices: [Vertex; 2],
-    pub local_shader_id: u32,
-    pub thickness: f32,
-}
-
-// ──── Плоскость (только геометрия и ссылки на вьюпорты) ────────
-#[derive(Clone, Debug)]
-pub struct Plane {
-    pub id: u32,
-    pub triangles: Vec<Triangle>,
-    pub lines: Vec<Line>,
-    /// Индексы в ViewportPool
-    pub viewport_indices: Vec<u32>,
-}
-
-// ──── Сцена (контейнер высшего уровня) ─────────────────────────
-#[derive(Clone)]
-pub struct Scene {
-    pub shader_pool: ShaderPool,
-    pub viewports: Vec<Viewport>,
-    pub planes: Vec<Plane>,
-}
-
-
-impl Scene {
-    pub fn new() -> Self {
-        Self{
-            shader_pool: ShaderPool::new(),
-            viewports: Vec::new(),
-            planes: Vec::new(),
-        }
-    }
-}
-
-
-// ──── Элемент и буфер ──────────────────────────────────────────
-
-#[derive(Copy, Clone, Debug)]
-pub struct Element {
-    pub object_id: u32,
-    pub depth: f32,
-    pub layer: u32,
-    pub color: [u8; 3],
-    pub luminance: f32,
-}
-
-#[derive(Clone)]
-pub struct ElementBuffer {
-    pub width: u32,
-    pub height: u32,
-    pub elements: Vec<Element>,
-}
 
 impl ElementBuffer {
-    pub fn new(width: u32, height: u32, bg_color: [u8; 3], bg_luminance: f32) -> Self {
-        let size = (width * height) as usize;
-        Self {
-            width,
-            height,
-            elements: vec![
-                Element {
-                    object_id: EMPTY_OBJECT_ID,
-                    depth: f32::INFINITY,
-                    layer: 0,
-                    color: bg_color,
-                    luminance: bg_luminance,
-                };
-                size
-            ],
-        }
-    }
-
-    fn index(&self, x: u32, y: u32) -> usize {
-        (y * self.width + x) as usize
-    }
 
     fn blend(&mut self, x: u32, y: u32, src_color: [u8; 4], luminance: f32, object_id: u32) {
-        let idx = self.index(x, y);
-        let elem = &mut self.elements[idx];
-
+        let elem = &mut self.get_mut(x, y).unwrap();
         let src_a = src_color[3] as u32;
         let src_r = src_color[0] as u32;
         let src_g = src_color[1] as u32;
         let src_b = src_color[2] as u32;
-
         let dst_r = elem.color[0] as u32;
         let dst_g = elem.color[1] as u32;
         let dst_b = elem.color[2] as u32;
-
-        let out_r = ((src_r * src_a + dst_r * (255 - src_a)) / 255) as u8;
-        let out_g = ((src_g * src_a + dst_g * (255 - src_a)) / 255) as u8;
-        let out_b = ((src_b * src_a + dst_b * (255 - src_a)) / 255) as u8;
-
-        elem.color = [out_r, out_g, out_b];
+        elem.color = [
+            ((src_r * src_a + dst_r * (255 - src_a)) / 255) as u8,
+            ((src_g * src_a + dst_g * (255 - src_a)) / 255) as u8,
+            ((src_b * src_a + dst_b * (255 - src_a)) / 255) as u8,
+        ];
         elem.luminance = luminance;
         if object_id != EMPTY_OBJECT_ID {
             elem.object_id = object_id;
         }
     }
 
-    /// Возвращает копию элемента по координатам (x, y).
-    /// Если координаты выходят за границы буфера, возвращает None.
-    pub fn get(&self, x: u32, y: u32) -> Option<Element> {
-        if x < self.width && y < self.height {
-            Some(self.elements[self.index(x, y)])
-        } else {
-            None
-        }
-    }
 }
 
 // ──── Трансформация вьюпорта ────────────────────────────────────
@@ -296,7 +36,9 @@ fn compute_viewport_transform(settings: &Settings, vp: &Viewport) -> (f32, f32, 
 
     // Абсолютные размеры для расчёта пропорций и масштаба
     let abs_w = if vp.width.abs() == 0.0 { 1.0 } else { vp.width.abs() };
-    let abs_h = if vp.height.abs() == 0.0 { 1.0 } else { vp.height.abs() * vp.element_aspect_ratio };
+    let abs_h = if vp.height.abs() == 0.0 { 1.0 } else { vp.height.abs() * vp.element_aspect_ratio};
+    // Домножение на соотношение сторон дискрет выходного буфера
+
 
     let out_aspect = out_w / out_h;
     let vp_aspect = abs_w / abs_h;
@@ -334,13 +76,10 @@ fn compute_viewport_transform(settings: &Settings, vp: &Viewport) -> (f32, f32, 
         VerticalAlignment::Bottom => -vp.y * base_scale_y + (out_h - scaled_h),
     };
 
-    // Теперь применяем зеркалирование
-    // Если ширина отрицательна – отражаем по X: масштаб становится отрицательным,
-    // а начало отсчёта сдвигается так, чтобы видимый прямоугольник остался на том же месте.
     let (scale_x, offset_x) = if vp.width < 0.0 {
         (
-            -base_scale_x,                           // масштаб отрицательный
-            out_w - (offset_x_base + scaled_w),      // сдвиг, сохраняющий положение прямоугольника
+            -base_scale_x,
+            out_w - (offset_x_base + scaled_w),
         )
     } else {
         (base_scale_x, offset_x_base)
@@ -367,6 +106,10 @@ fn apply_viewport(
     offset_x: f32,
     offset_y: f32,
 ) {
+    // Трансформация геометрии под соотношение сторон выходного буфера
+    if vp.element_aspect_ratio != 1.0 {
+        vertex.y *= vp.element_aspect_ratio;
+    }
     // Если есть поворот, вращаем вокруг центра вьюпорта
     if vp.rotation_angle != 0.0 {
         let cx = vp.x + vp.width / 2.0;
@@ -381,12 +124,8 @@ fn apply_viewport(
         vertex.y = cy + dx * sin + dy * cos;
     }
     
-    // Затем масштабирование и сдвиг (как раньше)
     vertex.x = vertex.x * scale_x + offset_x;
     vertex.y = vertex.y * scale_y + offset_y;
-    if vp.element_aspect_ratio != 1.0 {
-        vertex.y *= vp.element_aspect_ratio;
-    }
 }
 
 /// Отсекает треугольник: возвращает true, если треугольник полностью вне буфера.
@@ -451,8 +190,8 @@ pub fn discretize(scene: &Scene, settings: &Settings) -> ElementBuffer {
                     continue;
                 }
 
-                // Растеризация
-                rasterize_triangle(&mut buffer, &transformed_tri, layer, &*shader, &mut transparent_fragments);
+                // Дискретизация
+                discretize_triangle(&mut buffer, &transformed_tri, layer, &*shader, &mut transparent_fragments);
             }
 
             // Обрабатываем линии (аналогично)
@@ -472,18 +211,23 @@ pub fn discretize(scene: &Scene, settings: &Settings) -> ElementBuffer {
                     continue;
                 }
 
-                rasterize_line(&mut buffer, &transformed_line, layer, &*shader, &mut transparent_fragments);
+                discretize_line(&mut buffer, &transformed_line, layer, &*shader, &mut transparent_fragments);
             }
         }
     }
 
     // Сортировка и смешивание прозрачных фрагментов
     transparent_fragments.sort_by(|a, b| {
-        a.layer.cmp(&b.layer).then_with(|| a.depth.partial_cmp(&b.depth).unwrap_or(std::cmp::Ordering::Equal))
+        a.layer.cmp(&b.layer).then_with(|| b.depth.partial_cmp(&a.depth).unwrap_or(std::cmp::Ordering::Equal))
     });
 
     for frag in &transparent_fragments {
-        buffer.blend(frag.x, frag.y, frag.color, frag.luminance, frag.object_id);
+        let background = &buffer.get(frag.x, frag.y).unwrap();
+        // Прозрачный фрагмент видим, только если он находится на том же или более высоком слое
+        // и его глубина МЕНЬШЕ (ближе) глубины фона.
+        if frag.layer >= background.layer && frag.depth < background.depth {
+            buffer.blend(frag.x, frag.y, frag.color, frag.luminance, frag.object_id);
+        }
     }
 
     buffer
@@ -503,7 +247,7 @@ struct TransparentFragment {
 
 // ──── Растеризация (с учётом coverage для линий, без сглаживания треугольников) ──
 
-fn rasterize_triangle(
+fn discretize_triangle(
     buffer: &mut ElementBuffer,
     tri: &Triangle,
     layer: u32,
@@ -557,8 +301,7 @@ fn rasterize_triangle(
             ];
             let luminance = w0 * v0.luminance + w1 * v1.luminance + w2 * v2.luminance;
 
-            let idx = buffer.index(x, y);
-            let current_element = buffer.elements[idx];
+            let current_element = buffer.get(x, y).unwrap();
 
             let input = ShaderInput {
                 uv: (u, v),
@@ -582,7 +325,7 @@ fn rasterize_triangle(
 
             if alpha == 255 {
                 if layer > current_element.layer || (layer == current_element.layer && depth < current_element.depth) {
-                    let elem = &mut buffer.elements[idx];
+                    let elem = &mut buffer.get_mut(x, y).unwrap();
                     elem.object_id = final_object_id;
                     elem.depth = depth;
                     elem.layer = layer;
@@ -604,7 +347,7 @@ fn rasterize_triangle(
     }
 }
 
-fn rasterize_line(
+fn discretize_line(
     buffer: &mut ElementBuffer,
     line: &Line,
     layer: u32,
@@ -660,8 +403,7 @@ fn rasterize_line(
             ];
             let luminance = (1.0 - t_actual) * v0.luminance + t_actual * v1.luminance;
 
-            let idx = buffer.index(x, y);
-            let current_element = buffer.elements[idx];
+            let current_element = buffer.get(x, y).unwrap();
 
             let input = ShaderInput {
                 uv: (u, v),
@@ -685,7 +427,7 @@ fn rasterize_line(
 
             if alpha == 255 {
                 if layer > current_element.layer || (layer == current_element.layer && depth < current_element.depth) {
-                    let elem = &mut buffer.elements[idx];
+                    let elem = &mut buffer.get_mut(x, y).unwrap();
                     elem.object_id = final_object_id;
                     elem.depth = depth;
                     elem.layer = layer;
