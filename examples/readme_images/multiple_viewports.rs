@@ -1,5 +1,7 @@
 use std::rc::Rc;
+use ab_glyph::{FontRef, PxScale};
 use image::{ImageBuffer, Rgba};
+use imageproc::drawing::draw_text_mut;
 use::overwhelement::*;
 
 struct SolidShader {
@@ -85,7 +87,7 @@ fn main() {
         id: 0,
         triangles: Vec::new(),
         lines: Vec::new(),
-        viewport_indices: vec![0],
+        viewport_indices: vec![0, 1, 2],
     };
 
     scene.planes.push(plane);
@@ -102,6 +104,10 @@ fn main() {
         element_aspect_ratio: 1.0,
         shader_map: vec![0, 1, 2, 3, 4, 5],
         rotation_angle: 3.1415,
+        buffer_offset_x: None,
+        buffer_offset_y: None,
+        buffer_width: None,
+        buffer_height: None,
     };
 
     scene.viewports.push(vp);
@@ -192,8 +198,20 @@ fn main() {
         });
     }
 
+    let mut vp1 = Viewport::new_with_scaling(10.05, 6.85, -2.95, 1.95, ScalingMode::Stretch)
+    .with_buffer_offset(390, 50)
+    .with_buffer_size(400, 300);
+    vp1.rotation_angle = 3.1415;
+    vp1.shader_map = vec![0, 1, 2, 3];
+    scene.add_viewport(vp1);
 
 
+    let mut vp2 = Viewport::new_with_scaling(6.05, 5.85, -2.95, 1.95, ScalingMode::Stretch)
+    .with_buffer_offset(390, 50)
+    .with_buffer_size(400, 300);
+    vp2.rotation_angle = 3.1415;
+    vp2.shader_map = vec![0, 1, 2, 3];
+    scene.add_viewport(vp2);
 
     let settings = Settings {
         output_width: W,
@@ -218,6 +236,18 @@ fn main() {
             img.put_pixel(x, y, pixel);
         }
     }
+    // Шрифт (положите файл .ttf в папку assets/ или используйте системный)
+    let font_data = include_bytes!("../assets/DejaVuSans.ttf");
+    let font = FontRef::try_from_slice(font_data).expect("Error loading font");
 
-    img.save("multiple_viewport.png").expect("Failed to save PNG with labels");
+    let scale = PxScale { x: 20.0, y: 20.0 };
+    let black = Rgba([0u8, 0u8, 0u8, 255u8]);
+
+    let plane_text_pos = (50_i32, 25_i32);
+    let viewport_text_pos = (400_i32, 30_i32);
+
+    draw_text_mut(&mut img, black, plane_text_pos.0, plane_text_pos.1, scale, &font, "Plane");
+    draw_text_mut(&mut img, black, viewport_text_pos.0, viewport_text_pos.1, scale, &font, "Viewports overlap");
+
+    img.save("multiple_viewports.png").expect("Failed to save PNG with labels");
 }

@@ -158,6 +158,10 @@ fn main() {
         element_aspect_ratio: 0.5,      
         shader_map: vec![0],
         rotation_angle: 0.0,
+        buffer_offset_x: None,
+        buffer_offset_y: None,
+        buffer_width: None,
+        buffer_height: None,
     };
     
     shaders.add(Rc::new(TextureShader { image: img }));

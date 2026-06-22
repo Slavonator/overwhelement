@@ -1,23 +1,22 @@
 use crate::{buffer_writing::*, datatypes::*, internal_datatypes::*, viewport_process::*};
 
 
-/// Отсекает треугольник: возвращает true, если треугольник полностью вне буфера.
-fn triangle_outside_buffer(tri: &Triangle, width: u32, height: u32) -> bool {
+/// Отсекает треугольник относительно заданной области (width×height).
+fn triangle_outside_buffer(tri: &Triangle, width: f32, height: f32) -> bool {
     let min_x = tri.vertices[0].x.min(tri.vertices[1].x).min(tri.vertices[2].x);
     let max_x = tri.vertices[0].x.max(tri.vertices[1].x).max(tri.vertices[2].x);
     let min_y = tri.vertices[0].y.min(tri.vertices[1].y).min(tri.vertices[2].y);
     let max_y = tri.vertices[0].y.max(tri.vertices[1].y).max(tri.vertices[2].y);
-    max_x < 0.0 || min_x >= width as f32 || max_y < 0.0 || min_y >= height as f32
+    max_x < 0.0 || min_x >= width || max_y < 0.0 || min_y >= height
 }
 
-fn line_outside_buffer(line: &Line, width: u32, height: u32) -> bool {
+fn line_outside_buffer(line: &Line, width: f32, height: f32) -> bool {
     let min_x = line.vertices[0].x.min(line.vertices[1].x);
     let max_x = line.vertices[0].x.max(line.vertices[1].x);
     let min_y = line.vertices[0].y.min(line.vertices[1].y);
     let max_y = line.vertices[0].y.max(line.vertices[1].y);
-    // Учитываем толщину
     let half = (line.thickness / 2.0).ceil();
-    max_x + half < 0.0 || min_x - half >= width as f32 || max_y + half < 0.0 || min_y - half >= height as f32
+    max_x + half < 0.0 || min_x - half >= width || max_y + half < 0.0 || min_y - half >= height
 }
 
 // ──── Основная функция дискретизации ───────────────────────────
@@ -42,6 +41,11 @@ pub fn discretize(scene: &Scene, settings: &Settings) -> ElementBuffer {
             };
             // Вычисляем трансформацию вьюпорта
             let (scale_x, scale_y, offset_x, offset_y) = compute_viewport_transform(settings, vp);
+            // Определяем область вьюпорта в пикселях
+            let clip_x = vp.buffer_offset_x.unwrap_or(0);
+            let clip_y = vp.buffer_offset_y.unwrap_or(0);
+            let clip_w = vp.buffer_width.filter(|&w| w > 0).unwrap_or(settings.output_width);
+            let clip_h = vp.buffer_height.filter(|&h| h > 0).unwrap_or(settings.output_height);
 
             // Обрабатываем треугольники
             for tri in &plane.triangles {
@@ -58,13 +62,20 @@ pub fn discretize(scene: &Scene, settings: &Settings) -> ElementBuffer {
                     apply_viewport(v, vp, scale_x, scale_y, offset_x, offset_y);
                 }
 
-                // Отсечение невидимых треугольников
-                if triangle_outside_buffer(&transformed_tri, settings.output_width, settings.output_height) {
+                if triangle_outside_buffer(&transformed_tri, clip_w as f32, clip_h as f32) {
                     continue;
                 }
-
-                // Дискретизация
-                discretize_triangle(&mut buffer, &transformed_tri, layer, &*shader, &mut transparent_fragments);
+                discretize_triangle(
+                    &mut buffer,
+                    &transformed_tri,
+                    layer,
+                    &*shader,
+                    &mut transparent_fragments,
+                    clip_x,
+                    clip_y,
+                    clip_w,
+                    clip_h,
+                );
             }
 
             // Обрабатываем линии (аналогично)
@@ -80,11 +91,20 @@ pub fn discretize(scene: &Scene, settings: &Settings) -> ElementBuffer {
                     apply_viewport(v, vp, scale_x, scale_y, offset_x, offset_y);
                 }
 
-                if line_outside_buffer(&transformed_line, settings.output_width, settings.output_height) {
+                if line_outside_buffer(&transformed_line, clip_w as f32, clip_h as f32) {
                     continue;
                 }
-
-                discretize_line(&mut buffer, &transformed_line, layer, &*shader, &mut transparent_fragments);
+                discretize_line(
+                    &mut buffer,
+                    &transformed_line,
+                    layer,
+                    &*shader,
+                    &mut transparent_fragments,
+                    clip_x,
+                    clip_y,
+                    clip_w,
+                    clip_h,
+                );
             }
         }
     }

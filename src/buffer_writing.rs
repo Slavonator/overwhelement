@@ -60,6 +60,10 @@ pub(crate) fn discretize_triangle(
     layer: u32,
     shader: &dyn ElementShader,
     transparent_fragments: &mut Vec<TransparentFragment>,
+    clip_x: u32,
+    clip_y: u32,
+    clip_w: u32,
+    clip_h: u32,
 ) {
     let v0 = &tri.vertices[0];
     let v1 = &tri.vertices[1];
@@ -70,10 +74,18 @@ pub(crate) fn discretize_triangle(
     let max_x = v0.x.max(v1.x).max(v2.x).ceil() as i32;
     let max_y = v0.y.max(v1.y).max(v2.y).ceil() as i32;
 
-    let min_x = min_x.max(0) as u32;
-    let min_y = min_y.max(0) as u32;
-    let max_x = (max_x.min(buffer.width as i32 - 1)) as u32;
-    let max_y = (max_y.min(buffer.height as i32 - 1)) as u32;
+    // Ограничиваем bounding box областью буфера и областью вьюпорта
+    let clip_x = clip_x as i32;
+    let clip_y = clip_y as i32;
+    let clip_x2 = (clip_x + clip_w as i32).min(buffer.width as i32);
+    let clip_y2 = (clip_y + clip_h as i32).min(buffer.height as i32);
+
+    let min_x = min_x.max(clip_x).max(0) as u32;
+    let min_y = min_y.max(clip_y).max(0) as u32;
+    let max_x = max_x.min(clip_x2 - 1).min(buffer.width as i32 - 1) as u32;
+    let max_y = max_y.min(clip_y2 - 1).min(buffer.height as i32 - 1) as u32;
+
+    if min_x > max_x || min_y > max_y { return; }
 
     let area = edge_function(v0, v1, v2);
     if area.abs() < 1e-12 { return; }
@@ -136,6 +148,10 @@ pub(crate) fn discretize_line(
     layer: u32,
     shader: &dyn ElementShader,
     transparent_fragments: &mut Vec<TransparentFragment>,
+    clip_x: u32,
+    clip_y: u32,
+    clip_w: u32,
+    clip_h: u32,
 ) {
     let v0 = &line.vertices[0];
     let v1 = &line.vertices[1];
@@ -148,17 +164,22 @@ pub(crate) fn discretize_line(
     let max_x = v0.x.max(v1.x) + max_dist;
     let max_y = v0.y.max(v1.y) + max_dist;
 
-    let min_x = (min_x.floor() as i32).max(0) as u32;
-    let min_y = (min_y.floor() as i32).max(0) as u32;
-    let max_x = (max_x.ceil() as i32).min(buffer.width as i32 - 1) as u32;
-    let max_y = (max_y.ceil() as i32).min(buffer.height as i32 - 1) as u32;
+    let clip_x = clip_x as i32;
+    let clip_y = clip_y as i32;
+    let clip_x2 = (clip_x + clip_w as i32).min(buffer.width as i32);
+    let clip_y2 = (clip_y + clip_h as i32).min(buffer.height as i32);
+
+    let min_x = (min_x.floor() as i32).max(clip_x).max(0) as u32;
+    let min_y = (min_y.floor() as i32).max(clip_y).max(0) as u32;
+    let max_x = (max_x.ceil() as i32).min(clip_x2 - 1).min(buffer.width as i32 - 1) as u32;
+    let max_y = (max_y.ceil() as i32).min(clip_y2 - 1).min(buffer.height as i32 - 1) as u32;
+
+    if min_x > max_x || min_y > max_y { return; }
 
     let dx = v1.x - v0.x;
     let dy = v1.y - v0.y;
     let len_sq = dx * dx + dy * dy;
-    if len_sq == 0.0 {
-        return;
-    }
+    if len_sq == 0.0 { return; }
 
     for y in min_y..=max_y {
         for x in min_x..=max_x {

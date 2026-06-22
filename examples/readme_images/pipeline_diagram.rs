@@ -56,6 +56,10 @@ fn main() {
         element_aspect_ratio: 1.0,
         shader_map: vec![0, 1],
         rotation_angle: 0.0,
+        buffer_offset_x: None,
+        buffer_offset_y: None,
+        buffer_width: None,
+        buffer_height: None,
     };
 
     scene.viewports.push(vp);

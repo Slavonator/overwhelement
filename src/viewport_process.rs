@@ -3,14 +3,19 @@ use crate::datatypes::*;
 
 /// Вычисляет масштаб и смещение для отображения viewport -> output.
 pub(crate) fn compute_viewport_transform(settings: &Settings, vp: &Viewport) -> (f32, f32, f32, f32) {
-    let out_w = settings.output_width as f32;
-    let out_h = settings.output_height as f32;
+    // Определяем рабочие размеры и смещение
+    let offset_px_x = vp.buffer_offset_x.unwrap_or(0) as f32;
+    let offset_px_y = vp.buffer_offset_y.unwrap_or(0) as f32;
+    let out_w = vp.buffer_width
+        .filter(|&w| w > 0)
+        .unwrap_or(settings.output_width) as f32;
+    let out_h = vp.buffer_height
+        .filter(|&h| h > 0)
+        .unwrap_or(settings.output_height) as f32;
 
-    // Абсолютные размеры для расчёта пропорций и масштаба
+    // Абсолютные размеры вьюпорта (в мировых координатах)
     let abs_w = if vp.width.abs() == 0.0 { 1.0 } else { vp.width.abs() };
-    let abs_h = if vp.height.abs() == 0.0 { 1.0 } else { vp.height.abs() * vp.element_aspect_ratio};
-    // Домножение на соотношение сторон дискрет выходного буфера
-
+    let abs_h = if vp.height.abs() == 0.0 { 1.0 } else { vp.height.abs() * vp.element_aspect_ratio };
 
     let out_aspect = out_w / out_h;
     let vp_aspect = abs_w / abs_h;
@@ -31,11 +36,10 @@ pub(crate) fn compute_viewport_transform(settings: &Settings, vp: &Viewport) -> 
         }
     };
 
-    // Размер в пикселях после масштабирования (всегда положительный)
     let scaled_w = abs_w * base_scale_x;
     let scaled_h = abs_h * base_scale_y;
 
-    // Выравнивание считаем ДЛЯ НЕОТРАЖЁННОГО вьюпорта (как будто width и height положительны)
+    // Выравнивание внутри выделенной области (без учёта смещения)
     let offset_x_base = match vp.horizontal_alignment {
         HorizontalAlignment::Right => -vp.x * base_scale_x,
         HorizontalAlignment::Center => -vp.x * base_scale_x + (out_w - scaled_w) / 2.0,
@@ -48,23 +52,17 @@ pub(crate) fn compute_viewport_transform(settings: &Settings, vp: &Viewport) -> 
         VerticalAlignment::Bottom => -vp.y * base_scale_y + (out_h - scaled_h),
     };
 
+    // Обработка отрицательных размеров (отражение) с учётом смещения
     let (scale_x, offset_x) = if vp.width < 0.0 {
-        (
-            -base_scale_x,
-            out_w - (offset_x_base + scaled_w),
-        )
+        (-base_scale_x, out_w - (offset_x_base + scaled_w) + offset_px_x)
     } else {
-        (base_scale_x, offset_x_base)
+        (base_scale_x, offset_x_base + offset_px_x)
     };
 
-    // Аналогично для Y
     let (scale_y, offset_y) = if vp.height < 0.0 {
-        (
-            -base_scale_y,
-            out_h - (offset_y_base + scaled_h),
-        )
+        (-base_scale_y, out_h - (offset_y_base + scaled_h) + offset_px_y)
     } else {
-        (base_scale_y, offset_y_base)
+        (base_scale_y, offset_y_base + offset_px_y)
     };
 
     (scale_x, scale_y, offset_x, offset_y)
