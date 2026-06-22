@@ -65,7 +65,7 @@ fn main() {
         color: [200, 50, 50, 255]   // красный
     };
     let inner_triangle2_color = SolidShader {
-        color: [50, 200, 50, 255]   // зелёный
+        color: [140u8, 230u8, 140u8, 255u8]   // зелёный
     };
 
     let vp_outline1 = SolidShader{
