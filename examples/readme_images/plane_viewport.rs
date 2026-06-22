@@ -2,7 +2,7 @@ use std::rc::Rc;
 use ab_glyph::{FontRef, PxScale};
 use image::{ImageBuffer, Rgba};
 use imageproc::drawing::draw_text_mut;
-use::overwhelement::{datatypes::*, *};
+use::overwhelement::*;
 
 
 const W: u32 = 800;

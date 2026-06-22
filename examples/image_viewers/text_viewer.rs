@@ -1,4 +1,4 @@
-use overwhelement::{datatypes::*, *};
+use overwhelement::*;
 use image::{open, RgbaImage};
 use std::{env, rc::Rc};
 use terminal_size::{terminal_size};

@@ -1,6 +1,6 @@
 use std::rc::Rc;
 use image::{ImageBuffer, Rgba};
-use::overwhelement::{datatypes::*, *};
+use::overwhelement::*;
 
 struct SolidShader {
     color: [u8; 4]
