@@ -21,6 +21,7 @@ fn line_outside_buffer(line: &Line, width: f32, height: f32) -> bool {
 
 // ──── Основная функция дискретизации ───────────────────────────
 
+/// Преобразует сцену из нескольких плоскостей с заданными параметрами в буфер дискрет
 pub fn discretize(scene: &Scene, settings: &Settings) -> ElementBuffer {
     let mut buffer = ElementBuffer::new(
         settings.output_width,
