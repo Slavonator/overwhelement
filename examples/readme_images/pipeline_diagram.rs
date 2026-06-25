@@ -1,12 +1,10 @@
-use::overwhelement::*;
+use overwhelement::*;
 use image::{ImageBuffer, Rgba};
 use ab_glyph::{FontRef, PxScale};
 use std::rc::Rc;
 
 const W: u32 = 800;
 const H: u32 = 240;
-
-// Сплошной шейдер с фиксированным цветом и object_id
 struct SolidShader {
     color: [u8; 4],
 }
@@ -22,165 +20,116 @@ impl ElementShader for SolidShader {
 }
 
 fn main() {
-    
-    let vw = 80;
-    let vh = 24;
+    let vw = 80.0;
+    let vh = 24.0;
 
+    let mut scene = Scene::new();
 
-    let mut scene = Scene {
-        shader_pool: ShaderPool::new(),
-        viewports: Vec::new(),
-        planes: Vec::new(),
-    };
+    let block_shader = SolidShader { color: [50, 120, 220, 255] };
+    let arrow_shader = SolidShader { color: [180, 180, 180, 255] };
 
-    
-    // Шейдеры
+    let block_idx = scene.shader_pool.add(Rc::new(block_shader));
+    let arrow_idx = scene.shader_pool.add(Rc::new(arrow_shader));
 
-    let block_shader = SolidShader {color: [50, 120, 220, 255]};
-    
-    let arrow_shader = SolidShader {color: [180, 180, 180, 255]};
-
-
-    scene.shader_pool.add(Rc::new(block_shader));
-    scene.shader_pool.add(Rc::new(arrow_shader));
-
-    // Вьюпорт на весь экран
     let vp = Viewport {
         x: 0.0,
         y: 0.0,
-        width: vw as f32,
-        height: vh as f32,
+        width: vw,
+        height: vh,
         scaling_mode: ScalingMode::Cover,
-        horizontal_alignment: HorizontalAlignment::Center,
-        vertical_alignment: VerticalAlignment::Center,
         element_aspect_ratio: 1.0,
-        shader_map: vec![0, 1],
+        shader_map: vec![block_idx, arrow_idx],
         rotation_angle: 0.0,
         buffer_offset_x: None,
         buffer_offset_y: None,
         buffer_width: None,
         buffer_height: None,
     };
+    let vp_idx = scene.add_viewport(vp);
 
-    scene.viewports.push(vp);
-
-    // Параметры блоков
     let box_w = 16.0;
     let box_h = 8.0;
     let margin = 8.0;
-
-    let y = (vh as f32 - box_h) / 2.0;
-
-    // Позиции блоков
+    let y = (vh - box_h) / 2.0;
     let x1 = 8.0;
     let x2 = x1 + box_w + margin;
     let x3 = x2 + box_w + margin;
 
-    // Плоскость диаграммы
-    let mut plane = Plane {
-        id: 1,
-        triangles: Vec::new(),
-        lines: Vec::new(),
-        viewport_indices: vec![0],
-    };
-
     let thickness = 4.0;
 
-    // Функция для создания линий рамки блока
-    let mut add_rect = |x: f32, y: f32, w: f32, h: f32| {
-        let right = x + w;
-        let bottom = y + h;
-        let lines = [
-            (Vertex::new(x, y), Vertex::new(right, y)),
-            (Vertex::new(right, y), Vertex::new(right, bottom)),
-            (Vertex::new(right, bottom), Vertex::new(x, bottom)),
-            (Vertex::new(x, bottom), Vertex::new(x, y)),
-        ];
-        for (start, end) in lines {
-            plane.lines.push(Line {
-                id: 1,
-                vertices: [start, end],
-                local_shader_id: 0,
-                thickness: thickness,
-            });
-        }
+    let mut add_line = |x1: f32, y1: f32, x2: f32, y2: f32, shader_id: u32, thick: f32| -> u32 {
+        let v1 = Vertex { x: x1, y: y1, depth: 0.0, u: 0.0, v: 0.0, normal: [0.0; 3], luminance: 1.0 };
+        let v2 = Vertex { x: x2, y: y2, depth: 0.0, u: 0.0, v: 0.0, normal: [0.0; 3], luminance: 1.0 };
+        let i1 = scene.add_vertex(v1);
+        let i2 = scene.add_vertex(v2);
+        let line = Line {
+            id: 0,
+            vertices: [i1, i2],
+            local_shader_id: shader_id,
+            thickness: thick,
+        };
+        scene.add_line(line)
     };
 
+    let mut line_indices = Vec::new();
 
-    add_rect(x1, y, box_w, box_h);
-    add_rect(x2, y, box_w, box_h);
-    add_rect(x3, y, box_w, box_h);
+    let rect_lines = [
+        (x1, y, x1 + box_w, y),
+        (x1 + box_w, y, x1 + box_w, y + box_h),
+        (x1 + box_w, y + box_h, x1, y + box_h),
+        (x1, y + box_h, x1, y),
+    ];
+    for (x1, y1, x2, y2) in rect_lines {
+        line_indices.push(add_line(x1, y1, x2, y2, block_idx, thickness));
+    }
 
-    // Стрелки между блоками
+    let rect_lines = [
+        (x2, y, x2 + box_w, y),
+        (x2 + box_w, y, x2 + box_w, y + box_h),
+        (x2 + box_w, y + box_h, x2, y + box_h),
+        (x2, y + box_h, x2, y),
+    ];
+    for (x1, y1, x2, y2) in rect_lines {
+        line_indices.push(add_line(x1, y1, x2, y2, block_idx, thickness));
+    }
+
+    let rect_lines = [
+        (x3, y, x3 + box_w, y),
+        (x3 + box_w, y, x3 + box_w, y + box_h),
+        (x3 + box_w, y + box_h, x3, y + box_h),
+        (x3, y + box_h, x3, y),
+    ];
+    for (x1, y1, x2, y2) in rect_lines {
+        line_indices.push(add_line(x1, y1, x2, y2, block_idx, thickness));
+    }
+
     let arrow_y = y + box_h / 2.0;
     let tip_w = 1.0;
     let tip_h = 1.0;
 
-    // Стрелка 1 → 2
-    plane.lines.push(Line {
-        id: 100,
-        vertices: [
-            Vertex::new(x1 + box_w, arrow_y),
-            Vertex::new(x2 - (thickness / 10.0), arrow_y),
-        ],
-        local_shader_id: 1,
-        thickness: 3.0,
-    });
-    plane.lines.push(Line {
-        id: 101,
-        vertices: [
-            Vertex::new(x2 - (thickness / 10.0), arrow_y),
-            Vertex::new(x2 - (thickness / 10.0) - tip_h, arrow_y - tip_w),
-        ],
-        local_shader_id: 1,
-        thickness: 3.0,
-    });
-    plane.lines.push(Line {
-        id: 102,
-        vertices: [
-            Vertex::new(x2 - (thickness / 10.0), arrow_y),
-            Vertex::new(x2 - (thickness / 10.0) - tip_h, arrow_y + tip_w),
-        ],
-        local_shader_id: 1,
-        thickness: 3.0,
-    });
+    let tip_x = x2 - (thickness / 10.0);
+    line_indices.push(add_line(x1 + box_w, arrow_y, tip_x, arrow_y, arrow_idx, 3.0));
+    line_indices.push(add_line(tip_x, arrow_y, tip_x - tip_h, arrow_y - tip_w, arrow_idx, 3.0));
+    line_indices.push(add_line(tip_x, arrow_y, tip_x - tip_h, arrow_y + tip_w, arrow_idx, 3.0));
 
-    // Стрелка 2 → 3
-    plane.lines.push(Line {
-        id: 200,
-        vertices: [
-            Vertex::new(x2 + box_w, arrow_y),
-            Vertex::new(x3 - (thickness / 10.0), arrow_y),
-        ],
-        local_shader_id: 1,
-        thickness: 3.0,
-    });
-    plane.lines.push(Line {
-        id: 201,
-        vertices: [
-            Vertex::new(x3 - (thickness / 10.0), arrow_y),
-            Vertex::new(x3 - (thickness / 10.0) - tip_h, arrow_y - tip_w),
-        ],
-        local_shader_id: 1,
-        thickness: 3.0,
-    });
-    plane.lines.push(Line {
-        id: 202,
-        vertices: [
-            Vertex::new(x3 - (thickness / 10.0), arrow_y),
-            Vertex::new(x3 - (thickness / 10.0) - tip_h, arrow_y + tip_w),
-        ],
-        local_shader_id: 1,
-        thickness: 3.0,
-    });
+    let tip_x2 = x3 - (thickness / 10.0);
+    line_indices.push(add_line(x2 + box_w, arrow_y, tip_x2, arrow_y, arrow_idx, 3.0));
+    line_indices.push(add_line(tip_x2, arrow_y, tip_x2 - tip_h, arrow_y - tip_w, arrow_idx, 3.0));
+    line_indices.push(add_line(tip_x2, arrow_y, tip_x2 - tip_h, arrow_y + tip_w, arrow_idx, 3.0));
 
-    scene.planes.push(plane);
+    let plane = Plane {
+        id: 0,
+        triangles: Vec::new(),
+        lines: line_indices,
+        viewport_indices: vec![vp_idx],
+    };
 
-    // Настройки
+    scene.add_plane(plane);
+
     let settings = Settings {
         output_width: W,
         output_height: H,
-        background_color: [240, 240, 240], // светлый фон
+        background_color: [240, 240, 240],
         background_luminance: 1.0,
     };
 
@@ -201,20 +150,14 @@ fn main() {
         }
     }
 
+    // Текст поверх изображения
     let words = ["провайдер", "дискретизатор", "интерпретатор"];
     let font_data = include_bytes!("../assets/DejaVuSans.ttf");
     let font = FontRef::try_from_slice(font_data).expect("Error loading font");
-
     let scale = PxScale { x: 20.0, y: 20.0 };
     let grey = Rgba([70u8, 70u8, 70u8, 255u8]);
 
-    // Позиции центров блоков (те же, что использовались для рамок)
-    let box_w = 160.0;
-    let box_h = 80.0;
-    let y = (H as f32 - box_h) / 2.0;
-    let x1 = 77.0;
-    let x2 = x1 + box_w + 80.0;
-    let x3 = x2 + box_w + 78.0;
+    let scale_factor = 10.0;
 
     let centers = [
         (x1 + box_w / 2.0, y + box_h / 2.0),
@@ -224,11 +167,13 @@ fn main() {
 
     for (i, (cx, cy)) in centers.iter().enumerate() {
         let text = words[i];
-        // Очень грубая оценка ширины текста: каждая буква примерно 10px при таком масштабе
+        let px = (cx * scale_factor) as i32;
+        let py = (cy * scale_factor) as i32;
+        // Грубая оценка ширины текста
         let text_width = text.chars().count() as i32 * 10;
-        let x = (*cx as i32) - text_width / 2;
-        let y = (*cy as i32) - 12; // чуть выше центра
-        imageproc::drawing::draw_text_mut(&mut img, grey, x, y, scale, &font, text);
+        let x_pos = px - text_width / 2;
+        let y_pos = py - 12; // чуть выше центра
+        imageproc::drawing::draw_text_mut(&mut img, grey, x_pos, y_pos, scale, &font, text);
     }
 
     img.save("pipeline.png").expect("Failed to save PNG with text");

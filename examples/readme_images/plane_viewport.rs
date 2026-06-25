@@ -27,11 +27,7 @@ fn main() {
         background_luminance: 0.0,
     };
 
-    let mut scene = Scene { 
-        shader_pool: ShaderPool::new(),
-        viewports: Vec::new(),
-        planes: Vec::new(),
-    };
+    let mut scene = Scene::new();
 
     // Шейдер, который будет изображать плоскость
     let plane_shader = SolidShader {color: [130u8, 130u8, 230u8, 255u8]};
@@ -50,15 +46,130 @@ fn main() {
     scene.shader_pool.add(Rc::new(plane_outline));
     scene.shader_pool.add(Rc::new(viewport_outline));
 
-    // Вьюпорт на весь экран
+    scene.vertices.push(Vertex::with_depth(1.0, 1.0, 1.0));
+    scene.vertices.push(Vertex::with_depth(10.0, 1.0, 1.0));
+    scene.vertices.push(Vertex::with_depth(14.0, 11.0, 1.0));
+    scene.vertices.push(Vertex::with_depth(4.0, 11.0, 1.0));
+
+    // Визуализируемая плоскость
+    scene.triangles.push(
+        Triangle { 
+            id: 0,
+            vertices: [0, 3, 2], 
+            local_shader_id: 0,
+        }
+    );
+
+    scene.triangles.push(
+        Triangle { 
+            id: 0,
+            vertices: [0, 1, 2], 
+            local_shader_id: 0,
+        }
+    );
+
+
+    scene.vertices.push(Vertex::with_depth(1.0, 1.0, 0.9));
+    scene.vertices.push(Vertex::with_depth(10.0, 1.0, 0.9));
+    scene.vertices.push(Vertex::with_depth(14.0, 11.0, 0.9));
+    scene.vertices.push(Vertex::with_depth(4.0, 11.0, 0.9));
+
+
+    let outline_thickness = 4.0;
+
+    scene.lines.push(Line {
+        id: 10,
+        vertices: [4, 5],
+        local_shader_id: 2,
+        thickness: outline_thickness,
+    });
+    scene.lines.push(Line {
+        id: 11,
+        vertices: [5, 6],
+        local_shader_id: 2,
+        thickness: outline_thickness,
+    });
+    scene.lines.push(Line {
+        id: 12,
+        vertices: [6, 7],
+        local_shader_id: 2,
+        thickness: outline_thickness,
+    });
+    scene.lines.push(Line {
+        id: 13,
+        vertices: [7, 4],
+        local_shader_id: 2,
+        thickness: outline_thickness,
+    });
+
+    // Визуализируемый вьюпорт
+
+    scene.vertices.push(Vertex::with_depth(1.5, 1.25, 0.3));
+    scene.vertices.push(Vertex::with_depth(3.15, 6.8, 0.3));
+    scene.vertices.push(Vertex::with_depth(7.1, 6.8, 0.3));
+    scene.vertices.push(Vertex::with_depth(5.0, 1.25, 0.3));
+
+    scene.triangles.push(
+        Triangle { 
+            id: 1,
+            vertices: [8, 9, 10], 
+            local_shader_id: 1,
+        }
+    );
+    scene.triangles.push(
+        Triangle { 
+            id: 1,
+            vertices: [8, 10, 11], 
+            local_shader_id: 1,
+        }
+    );
+
+    scene.vertices.push(Vertex::with_depth(1.5, 1.25, 0.2));
+    scene.vertices.push(Vertex::with_depth(3.15, 6.8, 0.2));
+    scene.vertices.push(Vertex::with_depth(7.1, 6.8, 0.2));
+    scene.vertices.push(Vertex::with_depth(5.0, 1.25, 0.2));
+
+
+    scene.lines.push(Line {
+        id: 10,
+        vertices: [12, 13],
+        local_shader_id: 3,
+        thickness: outline_thickness,
+    });
+    scene.lines.push(Line {
+        id: 11,
+        vertices: [13, 14],
+        local_shader_id: 3,
+        thickness: outline_thickness,
+    });
+    scene.lines.push(Line {
+        id: 12,
+        vertices: [14, 15],
+        local_shader_id: 3,
+        thickness: outline_thickness,
+    });
+    scene.lines.push(Line {
+        id: 13,
+        vertices: [15, 12],
+        local_shader_id: 3,
+        thickness: outline_thickness,
+    });
+
+    // Плоскость
+    let plane = Plane {
+        id: 0,
+        triangles: vec![0, 1, 2, 3],
+        lines: vec![0, 1, 2, 3, 4, 5, 6, 7],
+        viewport_indices: vec![0],
+    };
+
+    // Вьюпорт 
     let vp = Viewport{
         x: 15.0,
         y: 0.0,
         width: -15.0,
         height: 15.0,
         scaling_mode: ScalingMode::Contain,
-        horizontal_alignment: HorizontalAlignment::Center,
-        vertical_alignment: VerticalAlignment::Center,
         element_aspect_ratio: 1.0,
         shader_map: vec![0, 1, 2, 3],
         rotation_angle: 3.1415,
@@ -70,122 +181,7 @@ fn main() {
 
     scene.viewports.push(vp);
 
-    // Плоскость
-    let mut actual_plane = Plane {
-        id: 0,
-        triangles: Vec::new(),
-        lines: Vec::new(),
-        viewport_indices: vec![0],
-    };
-
-    // Треугольники
-
-    let v1 = Vertex::with_depth(1.0, 1.0, 1.0);
-    let v2 = Vertex::with_depth(10.0, 1.0, 1.0);
-    let v3 = Vertex::with_depth(14.0, 11.0, 1.0);
-    let v4 = Vertex::with_depth(4.0, 11.0, 1.0);
-
-    // Визуализируемая плоскость
-    actual_plane.triangles.push(
-        Triangle { 
-            id: 0,
-            vertices: [v1, v4, v3], 
-            local_shader_id: 0,
-        }
-    );
-    actual_plane.triangles.push(
-        Triangle { 
-            id: 0,
-            vertices: [v1, v2, v3], 
-            local_shader_id: 0,
-        }
-    );
-
-    let v1 = Vertex::with_depth(1.0, 1.0, 0.5);
-    let v2 = Vertex::with_depth(10.0, 1.0, 0.5);
-    let v3 = Vertex::with_depth(14.0, 11.0, 0.5);
-    let v4 = Vertex::with_depth(4.0, 11.0, 0.5);
-
-    let outline_thickness = 4.0;
-
-    actual_plane.lines.push(Line {
-        id: 10,
-        vertices: [v1, v2],
-        local_shader_id: 2,
-        thickness: outline_thickness,
-    });
-    actual_plane.lines.push(Line {
-        id: 11,
-        vertices: [v2, v3],
-        local_shader_id: 2,
-        thickness: outline_thickness,
-    });
-    actual_plane.lines.push(Line {
-        id: 12,
-        vertices: [v3, v4],
-        local_shader_id: 2,
-        thickness: outline_thickness,
-    });
-    actual_plane.lines.push(Line {
-        id: 13,
-        vertices: [v4, v1],
-        local_shader_id: 2,
-        thickness: outline_thickness,
-    });
-
-    // Визуализируемый вьюпорт
-
-    let v1 = Vertex::with_depth(1.5, 1.25, 0.3);
-    let v2 = Vertex::with_depth(3.15, 6.8, 0.3);
-    let v3 = Vertex::with_depth(7.1, 6.8, 0.3);
-    let v4 = Vertex::with_depth(5.0, 1.25, 0.3);
-
-    actual_plane.triangles.push(
-        Triangle { 
-            id: 1,
-            vertices: [v1, v2, v3], 
-            local_shader_id: 1,
-        }
-    );
-    actual_plane.triangles.push(
-        Triangle { 
-            id: 1,
-            vertices: [v1, v3, v4], 
-            local_shader_id: 1,
-        }
-    );
-
-    let v1 = Vertex::with_depth(1.5, 1.25, 0.1);
-    let v2 = Vertex::with_depth(3.15, 6.8, 0.1);
-    let v3 = Vertex::with_depth(7.1, 6.8, 0.1);
-    let v4 = Vertex::with_depth(5.0, 1.25, 0.1);
-
-    actual_plane.lines.push(Line {
-        id: 10,
-        vertices: [v1, v2],
-        local_shader_id: 3,
-        thickness: outline_thickness,
-    });
-    actual_plane.lines.push(Line {
-        id: 11,
-        vertices: [v2, v3],
-        local_shader_id: 3,
-        thickness: outline_thickness,
-    });
-    actual_plane.lines.push(Line {
-        id: 12,
-        vertices: [v3, v4],
-        local_shader_id: 3,
-        thickness: outline_thickness,
-    });
-    actual_plane.lines.push(Line {
-        id: 13,
-        vertices: [v4, v1],
-        local_shader_id: 3,
-        thickness: outline_thickness,
-    });
-
-    scene.planes.push(actual_plane);
+    scene.planes.push(plane);
 
     let buffer = discretize(&scene, &settings);
 

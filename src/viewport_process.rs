@@ -1,11 +1,6 @@
 use crate::datatypes::*;
 
-
-/// Вычисляет масштаб и смещение для отображения viewport -> output.
 pub(crate) fn compute_viewport_transform(settings: &Settings, vp: &Viewport) -> (f32, f32, f32, f32) {
-    // Определяем рабочие размеры и смещение
-    let offset_px_x = vp.buffer_offset_x.unwrap_or(0) as f32;
-    let offset_px_y = vp.buffer_offset_y.unwrap_or(0) as f32;
     let out_w = vp.buffer_width
         .filter(|&w| w > 0)
         .unwrap_or(settings.output_width) as f32;
@@ -13,7 +8,6 @@ pub(crate) fn compute_viewport_transform(settings: &Settings, vp: &Viewport) -> 
         .filter(|&h| h > 0)
         .unwrap_or(settings.output_height) as f32;
 
-    // Абсолютные размеры вьюпорта (в мировых координатах)
     let abs_w = if vp.width.abs() == 0.0 { 1.0 } else { vp.width.abs() };
     let abs_h = if vp.height.abs() == 0.0 { 1.0 } else { vp.height.abs() * vp.element_aspect_ratio };
 
@@ -39,20 +33,13 @@ pub(crate) fn compute_viewport_transform(settings: &Settings, vp: &Viewport) -> 
     let scaled_w = abs_w * base_scale_x;
     let scaled_h = abs_h * base_scale_y;
 
-    // Выравнивание внутри выделенной области (без учёта смещения)
-    let offset_x_base = match vp.horizontal_alignment {
-        HorizontalAlignment::Right => -vp.x * base_scale_x,
-        HorizontalAlignment::Center => -vp.x * base_scale_x + (out_w - scaled_w) / 2.0,
-        HorizontalAlignment::Left => -vp.x * base_scale_x + (out_w - scaled_w),
-    };
+    let offset_px_x = vp.buffer_offset_x.unwrap_or(0) as f32;
+    let offset_px_y = vp.buffer_offset_y.unwrap_or(0) as f32;
 
-    let offset_y_base = match vp.vertical_alignment {
-        VerticalAlignment::Top => -vp.y * base_scale_y,
-        VerticalAlignment::Center => -vp.y * base_scale_y + (out_h - scaled_h) / 2.0,
-        VerticalAlignment::Bottom => -vp.y * base_scale_y + (out_h - scaled_h),
-    };
+    // Выравнивания больше нет, просто смещаем
+    let offset_x_base = -vp.x * base_scale_x;
+    let offset_y_base = -vp.y * base_scale_y;
 
-    // Обработка отрицательных размеров (отражение) с учётом смещения
     let (scale_x, offset_x) = if vp.width < 0.0 {
         (-base_scale_x, out_w - (offset_x_base + scaled_w) + offset_px_x)
     } else {
@@ -76,24 +63,19 @@ pub(crate) fn apply_viewport(
     offset_x: f32,
     offset_y: f32,
 ) {
-    // Трансформация геометрии под соотношение сторон выходного буфера
     if vp.element_aspect_ratio != 1.0 {
         vertex.y *= vp.element_aspect_ratio;
     }
-    // Если есть поворот, вращаем вокруг центра вьюпорта
     if vp.rotation_angle != 0.0 {
         let cx = vp.x + vp.width / 2.0;
         let cy = vp.y + vp.height / 2.0;
         let cos = vp.rotation_angle.cos();
         let sin = vp.rotation_angle.sin();
-        
         let dx = vertex.x - cx;
         let dy = vertex.y - cy;
-        
         vertex.x = cx + dx * cos - dy * sin;
         vertex.y = cy + dx * sin + dy * cos;
     }
-    
     vertex.x = vertex.x * scale_x + offset_x;
     vertex.y = vertex.y * scale_y + offset_y;
 }
