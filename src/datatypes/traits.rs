@@ -1,4 +1,4 @@
-use super::structures::{shader_input::ShaderInput, shader_output::ShaderOutput};
+use super::{ShaderInput, ShaderOutput};
 
 /// Трейт, который должны реализовать шейдеры
 pub trait ElementShader {

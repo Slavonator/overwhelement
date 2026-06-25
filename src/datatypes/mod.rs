@@ -1,7 +1,7 @@
-pub mod constants;
-pub mod enums;
-pub mod traits;
-pub mod structures;
+mod constants;
+mod enums;
+mod traits;
+mod structures;
 
 pub use constants::{EMPTY_OBJECT_ID, VOID_DEPTH};
 pub use enums::ScalingMode;
